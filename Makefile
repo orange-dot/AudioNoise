@@ -5,7 +5,7 @@ LDLIBS = -lm
 PYTHON = python3
 PLAY = ffplay -v fatal -nodisp -autoexit -f s32le -ar 48000 -ch_layout mono -i pipe:0
 
-effects = flanger echo fm phaser discont am distortion tube growlingbass pll
+effects = flanger echo fm phaser discont am distortion svfdrive tube growlingbass pll
 flanger_defaults = 0.6 0.6 0.6 0.6
 echo_defaults = 0.3 0.3 0.3 0.3
 fm_defaults = 0.25 0.25 0.5 0.5
@@ -13,11 +13,12 @@ am_defaults = 0.25 0.25 0.5 0.5
 phaser_defaults = 0.3 0.3 0.5 0.5
 discont_defaults = 0.8 0.1 0.2 0.2
 distortion_defaults = 0.5 0.6 0.8 0.0
+svfdrive_defaults = 0.45 0.55 0.45 0.25
 tube_defaults = 0.5 0.2 0.0 1.0
 growlingbass_defaults = 0.4 0.35 0.0 0.4
 pll_defaults = 0.25 0.5 0.5 0.5
 
-HEADERS = am.h biquad.h discont.h distortion.h echo.h effect.h flanger.h growlingbass.h  fm.h  gensin.h lfo.h  phaser.h  util.h process.h tube.h pll.h
+HEADERS = am.h biquad.h discont.h distortion.h echo.h effect.h flanger.h growlingbass.h  fm.h  gensin.h lfo.h  phaser.h  util.h process.h svfdrive.h tube.h pll.h
 
 default:
 	@echo "Pick one of" $(effects)
@@ -61,7 +62,7 @@ gensin.h: gensin
 
 gensin: gensin.c
 
-test: test-sincos test-lfo
+test: test-sincos test-lfo test-svfdrive
 
 tests/lfo: tests/lfo.o
 tests/lfo.o: $(HEADERS)
@@ -73,4 +74,9 @@ tests/sincos.o: $(HEADERS)
 test-sincos: tests/sincos
 	tests/sincos
 
-.PHONY: default play $(effects) SeymourDuncan visualize test-lfo test-sincos
+tests/svfdrive: tests/svfdrive.o
+tests/svfdrive.o: $(HEADERS)
+test-svfdrive: tests/svfdrive
+	tests/svfdrive
+
+.PHONY: default play $(effects) SeymourDuncan visualize test-lfo test-sincos test-svfdrive
