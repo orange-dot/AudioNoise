@@ -38,8 +38,8 @@ $(effects): input.raw convert
 	ffmpeg -y -v fatal -f s32le -ar 48000 -ac 1 -i output.raw -f mp3 $@.mp3
 	$(PLAY) < output.raw
 
-convert.o effect_registry.o: CFLAGS += $(DSP_CFLAGS)
-live_alsa.o: CFLAGS += $(DSP_CFLAGS)
+convert.o effect_registry.o: private CFLAGS += $(DSP_CFLAGS)
+live_alsa.o: private CFLAGS += $(DSP_CFLAGS)
 convert.o: process.h effect_registry.h types.h
 effect_registry.o: $(HEADERS)
 live_alsa.o: live_alsa.c effect_registry.h types.h
