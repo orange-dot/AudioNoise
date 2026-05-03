@@ -24,6 +24,7 @@
 #include "phaser.h"
 #include "discont.h"
 #include "distortion.h"
+#include "svfdrive.h"
 #include "tube.h"
 #include "growlingbass.h"
 #include "pll.h"
@@ -41,6 +42,7 @@ struct effect {
 } effects[] = {
 	EFF(discont),
 	EFF(distortion),
+	EFF(svfdrive),
 	EFF(echo),
 	EFF(flanger),
 	EFF(phaser),

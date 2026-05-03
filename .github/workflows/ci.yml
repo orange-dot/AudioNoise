@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+
+permissions:
+  contents: read
+
+jobs:
+  fast:
+    name: Fast build and tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Build converter
+        run: make convert
+
+      - name: Run fast tests
+        run: make test-fast
+
+      - name: Smoke-test svfdrive converter path
+        run: head -c 4096 /dev/zero | ./convert svfdrive 0.45 0.55 0.45 0.25 - /tmp/svfdrive.raw
+
+  exhaustive-lfo:
+    name: Exhaustive LFO sweep
+    if: contains(github.event.pull_request.labels.*.name, 'run-exhaustive-lfo')
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Run exhaustive LFO test
+        run: make test-exhaustive
