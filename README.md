@@ -1,6 +1,6 @@
 # AudioNoise Fork Experiment
 
-This fork keeps the original AudioNoise idea intact: a small, direct digital
+This fork keeps the original AudioNoise idea intact (whenever its pragmatic): a small, direct digital
 audio-effects sandbox shaped like a pedal, with simple single-sample DSP rather
 than a plugin host, amp modeler, or large framework.
 
