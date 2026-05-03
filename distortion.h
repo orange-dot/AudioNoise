@@ -4,6 +4,10 @@
 // Provides soft clipping (overdrive) through hard clipping (fuzz)
 // with optional tone control via low-pass filter.
 //
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "distortion.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 static struct {
 	float drive;
 	float tone_freq;

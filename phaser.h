@@ -1,3 +1,7 @@
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "phaser.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 struct {
 	struct lfo_state lfo;
 	struct biquad_coeff coeff;

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #define SAMPLES_PER_SEC 48000.0f
+#define AUDIONOISE_EFFECT_INTERNAL
 
 #include "../util.h"
 #include "../svfdrive.h"

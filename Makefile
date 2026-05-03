@@ -18,7 +18,8 @@ tube_defaults = 0.5 0.2 0.0 1.0
 growlingbass_defaults = 0.4 0.35 0.0 0.4
 pll_defaults = 0.25 0.5 0.5 0.5
 
-HEADERS = am.h biquad.h discont.h distortion.h echo.h effect.h flanger.h growlingbass.h  fm.h  gensin.h lfo.h  phaser.h  util.h process.h svfdrive.h tube.h pll.h
+HEADERS = am.h biquad.h discont.h distortion.h echo.h effect.h effect_registry.h flanger.h growlingbass.h fm.h gensin.h lfo.h phaser.h process.h svfdrive.h tube.h types.h util.h pll.h
+DSP_CFLAGS = -ffast-math -fsingle-precision-constant -Wfloat-conversion # -Wdouble-promotion
 
 default:
 	@echo "Pick one of" $(effects)
@@ -37,10 +38,11 @@ $(effects): input.raw convert
 	ffmpeg -y -v fatal -f s32le -ar 48000 -ac 1 -i output.raw -f mp3 $@.mp3
 	$(PLAY) < output.raw
 
-convert.o: CFLAGS += -ffast-math -fsingle-precision-constant -Wfloat-conversion # -Wdouble-promotion
-convert.o: $(HEADERS)
+convert.o effect_registry.o: CFLAGS += $(DSP_CFLAGS)
+convert.o: process.h effect_registry.h types.h
+effect_registry.o: $(HEADERS)
 
-convert: convert.o
+convert: convert.o effect_registry.o
 
 output.raw: input.raw convert
 	./convert echo $(echo_defaults) input.raw output.raw
@@ -64,7 +66,7 @@ gensin: gensin.c
 
 test: test-fast
 
-test-fast: test-sincos test-svfdrive
+test-fast: test-sincos test-svfdrive test-convert-regression
 test-exhaustive: test-lfo
 
 tests/lfo: tests/lfo.o
@@ -82,4 +84,15 @@ tests/svfdrive.o: $(HEADERS)
 test-svfdrive: tests/svfdrive
 	tests/svfdrive
 
-.PHONY: default play $(effects) SeymourDuncan visualize test test-fast test-exhaustive test-lfo test-sincos test-svfdrive
+tests/regression/svfdrive_input: tests/regression/svfdrive_input.o
+
+SVFDRIVE_REGRESSION_SHA256 = d47942152608df076ac3af64cc9df6b809747011bf0cea72519c50b906db00de
+SVFDRIVE_REGRESSION_INPUT = /tmp/audionoise-svfdrive-regression-input.s32
+SVFDRIVE_REGRESSION_OUTPUT = /tmp/audionoise-svfdrive-regression-output.s32
+
+test-convert-regression: convert tests/regression/svfdrive_input
+	tests/regression/svfdrive_input > $(SVFDRIVE_REGRESSION_INPUT)
+	./convert svfdrive $(svfdrive_defaults) $(SVFDRIVE_REGRESSION_INPUT) $(SVFDRIVE_REGRESSION_OUTPUT)
+	echo "$(SVFDRIVE_REGRESSION_SHA256)  $(SVFDRIVE_REGRESSION_OUTPUT)" | sha256sum -c -
+
+.PHONY: default play $(effects) SeymourDuncan visualize test test-fast test-exhaustive test-lfo test-sincos test-svfdrive test-convert-regression

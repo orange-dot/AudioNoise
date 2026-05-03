@@ -5,61 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-#include <math.h>
-
-#define SAMPLES_PER_SEC (48000.0)
-
-// Core utility functions and helpers
-#include "util.h"
-#include "lfo.h"
-#include "effect.h"
-#include "biquad.h"
 #include "process.h"
-
-// Effects
-#include "flanger.h"
-#include "echo.h"
-#include "fm.h"
-#include "am.h"
-#include "phaser.h"
-#include "discont.h"
-#include "distortion.h"
-#include "svfdrive.h"
-#include "tube.h"
-#include "growlingbass.h"
-#include "pll.h"
-
-static void magnitude_describe(float pot[4]) { fprintf(stderr, "\n"); }
-static void magnitude_init(float pot[4]) {}
-static float magnitude_step(float in) { return u32_to_fraction(magnitude); }
-
-#define EFF(x) { #x, x##_describe, x##_init, x##_step }
-struct effect {
-	const char *name;
-	void (*describe)(float[4]);
-	void (*init)(float[4]);
-	float (*step)(float);
-} effects[] = {
-	EFF(discont),
-	EFF(distortion),
-	EFF(svfdrive),
-	EFF(echo),
-	EFF(flanger),
-	EFF(phaser),
-	EFF(tube),
-	EFF(growlingbass),
-	EFF(pll),
-
-	/* "Helper" effects */
-	EFF(am),
-	EFF(fm),
-	EFF(magnitude),
-};
-
-#define UPDATE(x) x += 0.001 * (target_##x - x)
+#include "effect_registry.h"
 
 #define BLOCKSIZE 200
-static inline int make_one_noise(int in, int out, struct effect *eff)
+static inline int make_one_noise(int in, int out, const struct effect *eff)
 {
 	s32 input[BLOCKSIZE], output[BLOCKSIZE];
 	int nr = read(in, input, sizeof(input));
@@ -68,7 +18,7 @@ static inline int make_one_noise(int in, int out, struct effect *eff)
 
 	nr /= 4;
 	for (int i = 0; i < nr; i++) {
-		UPDATE(effect_delay);
+		audionoise_effect_tick();
 
 		float val = process_input(input[i]);
 
@@ -85,7 +35,7 @@ static float pots[4] = { 0.5, 0.5, 0.5, 0.5 };
 
 static void *modify_pots(void *arg)
 {
-	struct effect *eff = arg;
+	const struct effect *eff = arg;
 
 	for (;;) {
 		char buf[5];
@@ -108,7 +58,7 @@ static void *modify_pots(void *arg)
 
 int main(int argc, char **argv)
 {
-	struct effect *eff = NULL;
+	const struct effect *eff = NULL;
 	int input = -1, output = -1;
 	int potnr = 0;
 
@@ -138,10 +88,7 @@ int main(int argc, char **argv)
 
 		// Is it the name of an effect and we don't have one yet?
 		if (!eff) {
-			for (int i = 0; i < ARRAY_SIZE(effects); i++) {
-				if (!strcmp(arg, effects[i].name))
-					eff = effects+i;
-			}
+			eff = audionoise_find_effect(arg);
 			if (eff)
 				continue;
 		}
@@ -201,7 +148,7 @@ int main(int argc, char **argv)
 
 	pthread_t pot_thread;
 	if (pot_control >= 0)
-		pthread_create(&pot_thread, NULL, modify_pots, eff);
+		pthread_create(&pot_thread, NULL, modify_pots, (void *)eff);
 
 	for (;;) {
 		eff->init(pots);

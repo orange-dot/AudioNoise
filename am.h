@@ -4,6 +4,10 @@
 // mainly for testing the LFO (and generating signals
 // for testing other effects)
 //
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "am.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 static struct {
 	struct lfo_state base_lfo, mod_lfo;
 	float depth, volume;
