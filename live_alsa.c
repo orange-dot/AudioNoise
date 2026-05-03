@@ -200,7 +200,8 @@ static int parse_unit_float(const char *option, const char *value, float *out)
 
 	errno = 0;
 	parsed = strtof(value, &end);
-	if (errno || end == value || *end || parsed < 0.0f || parsed > 1.0f) {
+	if (errno || end == value || *end || !isfinite(parsed) ||
+	    parsed < 0.0f || parsed > 1.0f) {
 		fprintf(stderr, "%s must be a number in [0.0,1.0], got '%s'\n",
 			option, value);
 		return -1;
@@ -651,6 +652,10 @@ static int write_all_frames(const struct pcm_side *playback, const void *buffer,
 			if (recover_pcm(playback->pcm, "playback", (int)written, &stats->playback))
 				return -1;
 			continue;
+		}
+		if (written == 0) {
+			fprintf(stderr, "playback write made no progress\n");
+			return -1;
 		}
 
 		offset += written;

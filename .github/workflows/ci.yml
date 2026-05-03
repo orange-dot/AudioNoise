@@ -44,6 +44,12 @@ jobs:
       - name: Reject unknown bypass effect before ALSA open
         run: "! ./live_alsa --bypass --effect bogus --input hw:99,99 --output hw:99,99"
 
+      - name: Reject non-finite live ALSA pot values
+        run: "! ./live_alsa --effect svfdrive --pot0 nan --input hw:99,99 --output hw:99,99"
+
+      - name: Reject non-finite live ALSA wet mix
+        run: "! ./live_alsa --effect svfdrive --wet nan --input hw:99,99 --output hw:99,99"
+
       - name: Fail cleanly for unavailable probe devices
         run: "! ./live_alsa --probe --input hw:99,99 --output hw:99,99"
 
