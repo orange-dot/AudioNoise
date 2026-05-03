@@ -1,11 +1,16 @@
 #define _GNU_SOURCE
 #include <alsa/asoundlib.h>
 #include <errno.h>
+#include <math.h>
+#include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "effect_registry.h"
+#include "process.h"
 #include "types.h"
 
 enum format_choice {
@@ -41,6 +46,14 @@ struct pcm_side {
 	snd_pcm_uframes_t buffer_size;
 };
 
+struct xrun_stats {
+	unsigned long capture;
+	unsigned long playback;
+	unsigned long periods;
+};
+
+static volatile sig_atomic_t stop_requested;
+
 static const struct live_config default_config = {
 	.rate = 44100,
 	.channels = 2,
@@ -75,6 +88,28 @@ static const char *pcm_format_name(snd_pcm_format_t format)
 static int is_hw_device(const char *device)
 {
 	return device && !strncmp(device, "hw:", 3);
+}
+
+static void request_stop(int signo)
+{
+	(void)signo;
+	stop_requested = 1;
+}
+
+static int install_signal_handlers(void)
+{
+	struct sigaction sa;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = request_stop;
+	sigemptyset(&sa.sa_mask);
+
+	if (sigaction(SIGINT, &sa, NULL) || sigaction(SIGTERM, &sa, NULL)) {
+		perror("sigaction");
+		return -1;
+	}
+
+	return 0;
 }
 
 static void usage(FILE *out, const char *argv0)
@@ -493,6 +528,153 @@ static int configure_pcm(const char *label, const char *device,
 	return -1;
 }
 
+static size_t sample_bytes(snd_pcm_format_t format)
+{
+	return (size_t)snd_pcm_format_physical_width(format) / 8;
+}
+
+static size_t frame_bytes(const struct pcm_side *side)
+{
+	return sample_bytes(side->format) * side->channels;
+}
+
+static float clamp_unit(float in)
+{
+	if (!isfinite(in))
+		return 0.0f;
+	if (in > 1.0f)
+		return 1.0f;
+	if (in < -1.0f)
+		return -1.0f;
+	return in;
+}
+
+static s32 unit_float_to_s32(float in)
+{
+	in = clamp_unit(in);
+	if (in >= 1.0f)
+		return INT32_MAX;
+	if (in <= -1.0f)
+		return INT32_MIN;
+	return (s32)(in * 2147483648.0f);
+}
+
+static float s32_to_unit_float(s32 sample)
+{
+	return sample * (1.0f / 2147483648.0f);
+}
+
+static float read_unit_sample(const void *buffer, snd_pcm_format_t format,
+			      size_t sample_index)
+{
+	if (format == SND_PCM_FORMAT_FLOAT_LE)
+		return clamp_unit(((const float *)buffer)[sample_index]);
+
+	return s32_to_unit_float(((const s32 *)buffer)[sample_index]);
+}
+
+static void write_output_sample(void *buffer, snd_pcm_format_t format,
+				size_t sample_index, s32 sample)
+{
+	if (format == SND_PCM_FORMAT_FLOAT_LE)
+		((float *)buffer)[sample_index] = s32_to_unit_float(sample);
+	else
+		((s32 *)buffer)[sample_index] = sample;
+}
+
+static void process_frames(const struct live_config *cfg,
+			   const struct pcm_side *capture,
+			   const struct pcm_side *playback,
+			   const void *input, void *output,
+			   snd_pcm_sframes_t frames)
+{
+	for (snd_pcm_sframes_t frame = 0; frame < frames; frame++) {
+		size_t in_index = (size_t)frame * capture->channels;
+		float mono = read_unit_sample(input, capture->format, in_index);
+
+		if (capture->channels == 2)
+			mono = 0.5f * (mono + read_unit_sample(input, capture->format, in_index + 1));
+
+		audionoise_effect_tick();
+
+		float dry = process_input(unit_float_to_s32(mono));
+		float out = dry;
+
+		if (!cfg->bypass) {
+			float wet = cfg->effect->step(dry);
+			out = dry + (wet - dry) * cfg->wet;
+		}
+
+		s32 sample = process_output(out);
+		size_t out_index = (size_t)frame * playback->channels;
+
+		write_output_sample(output, playback->format, out_index, sample);
+		if (playback->channels == 2)
+			write_output_sample(output, playback->format, out_index + 1, sample);
+	}
+}
+
+static int recover_pcm(snd_pcm_t *pcm, const char *label, int err,
+		       unsigned long *xrun_count)
+{
+	if (err == -EINTR)
+		return 0;
+	if (err == -EPIPE || err == -ESTRPIPE)
+		(*xrun_count)++;
+
+	int recovered = snd_pcm_recover(pcm, err, 1);
+	if (recovered < 0 && (err == -EPIPE || err == -ESTRPIPE))
+		recovered = snd_pcm_prepare(pcm);
+
+	if (recovered < 0) {
+		fprintf(stderr, "%s recover failed after %s: %s\n",
+			label, snd_strerror(err), snd_strerror(recovered));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int write_all_frames(const struct pcm_side *playback, const void *buffer,
+			    snd_pcm_sframes_t frames, struct xrun_stats *stats)
+{
+	snd_pcm_sframes_t offset = 0;
+	size_t bytes_per_frame = frame_bytes(playback);
+
+	while (offset < frames && !stop_requested) {
+		const char *ptr = (const char *)buffer + (size_t)offset * bytes_per_frame;
+		snd_pcm_sframes_t written = snd_pcm_writei(playback->pcm, ptr, frames - offset);
+
+		if (written < 0) {
+			if (written == -EINTR && stop_requested)
+				return 0;
+			if (recover_pcm(playback->pcm, "playback", (int)written, &stats->playback))
+				return -1;
+			continue;
+		}
+
+		offset += written;
+	}
+
+	return 0;
+}
+
+static int report_due(struct timespec *next_report)
+{
+	struct timespec now;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &now))
+		return 0;
+
+	if (now.tv_sec < next_report->tv_sec ||
+	    (now.tv_sec == next_report->tv_sec && now.tv_nsec < next_report->tv_nsec))
+		return 0;
+
+	next_report->tv_sec = now.tv_sec + 5;
+	next_report->tv_nsec = now.tv_nsec;
+	return 1;
+}
+
 static int run_probe(const struct live_config *cfg)
 {
 	struct pcm_side capture = { 0 };
@@ -504,8 +686,10 @@ static int run_probe(const struct live_config *cfg)
 		goto out;
 
 	if (configure_pcm("playback", cfg->output_device, SND_PCM_STREAM_PLAYBACK,
-			  cfg->playback_format, cfg, &playback))
+			  cfg->playback_format, cfg, &playback)) {
+		fprintf(stderr, "playback device cannot match requested rate/channels/period_size/buffer_size; format may differ, but strict hw: disables ALSA conversion\n");
 		goto out;
+	}
 
 	fprintf(stderr, "probe OK\n");
 	ret = 0;
@@ -520,9 +704,89 @@ out:
 
 static int run_live(const struct live_config *cfg)
 {
-	(void)cfg;
-	fprintf(stderr, "live ALSA processing loop is not implemented in this slice\n");
-	return 1;
+	struct pcm_side capture = { 0 };
+	struct pcm_side playback = { 0 };
+	struct xrun_stats stats = { 0 };
+	struct timespec next_report = { 0 };
+	void *input = NULL;
+	void *output = NULL;
+	int ret = 1;
+
+	if (install_signal_handlers())
+		return 1;
+
+	if (configure_pcm("capture", cfg->input_device, SND_PCM_STREAM_CAPTURE,
+			  cfg->capture_format, cfg, &capture))
+		goto out;
+
+	if (configure_pcm("playback", cfg->output_device, SND_PCM_STREAM_PLAYBACK,
+			  cfg->playback_format, cfg, &playback)) {
+		fprintf(stderr, "playback device cannot match requested rate/channels/period_size/buffer_size; format may differ, but strict hw: disables ALSA conversion\n");
+		goto out;
+	}
+
+	input = calloc(capture.period_size, frame_bytes(&capture));
+	output = calloc(playback.period_size, frame_bytes(&playback));
+	if (!input || !output) {
+		perror("calloc");
+		goto out;
+	}
+
+	if (snd_pcm_prepare(capture.pcm) < 0 || snd_pcm_prepare(playback.pcm) < 0) {
+		fprintf(stderr, "failed to prepare ALSA PCMs\n");
+		goto out;
+	}
+
+	if (cfg->bypass) {
+		fprintf(stderr, "Live bypass: noise-gated mono dry, wet ignored\n");
+	} else {
+		fprintf(stderr, "Live %s: ", cfg->effect->name);
+		cfg->effect->describe((float *)cfg->pots);
+		cfg->effect->init((float *)cfg->pots);
+	}
+
+	if (!clock_gettime(CLOCK_MONOTONIC, &next_report))
+		next_report.tv_sec += 5;
+
+	while (!stop_requested) {
+		snd_pcm_sframes_t frames = snd_pcm_readi(capture.pcm, input, capture.period_size);
+
+		if (frames < 0) {
+			if (frames == -EINTR && stop_requested)
+				break;
+			if (recover_pcm(capture.pcm, "capture", (int)frames, &stats.capture))
+				goto out;
+			continue;
+		}
+		if (frames == 0)
+			continue;
+
+		process_frames(cfg, &capture, &playback, input, output, frames);
+		if (write_all_frames(&playback, output, frames, &stats))
+			goto out;
+
+		stats.periods++;
+		if (report_due(&next_report))
+			fprintf(stderr, "xruns: cap=%lu play=%lu periods=%lu\n",
+				stats.capture, stats.playback, stats.periods);
+	}
+
+	ret = 0;
+
+out:
+	fprintf(stderr, "final: xruns cap=%lu play=%lu periods=%lu\n",
+		stats.capture, stats.playback, stats.periods);
+	free(input);
+	free(output);
+	if (capture.pcm) {
+		snd_pcm_drop(capture.pcm);
+		snd_pcm_close(capture.pcm);
+	}
+	if (playback.pcm) {
+		snd_pcm_drop(playback.pcm);
+		snd_pcm_close(playback.pcm);
+	}
+	return ret;
 }
 
 int main(int argc, char **argv)
