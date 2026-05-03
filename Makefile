@@ -39,10 +39,15 @@ $(effects): input.raw convert
 	$(PLAY) < output.raw
 
 convert.o effect_registry.o: CFLAGS += $(DSP_CFLAGS)
+live_alsa.o: CFLAGS += $(DSP_CFLAGS)
 convert.o: process.h effect_registry.h types.h
 effect_registry.o: $(HEADERS)
+live_alsa.o: live_alsa.c effect_registry.h types.h
 
 convert: convert.o effect_registry.o
+
+live_alsa: LDLIBS += -lasound
+live_alsa: live_alsa.o effect_registry.o
 
 output.raw: input.raw convert
 	./convert echo $(echo_defaults) input.raw output.raw
