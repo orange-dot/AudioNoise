@@ -1,4 +1,23 @@
-## Another silly guitar-pedal-related repo
+# AudioNoise Fork Experiment
+
+This fork keeps the original AudioNoise idea intact: a small, direct digital
+audio-effects sandbox shaped like a pedal, with simple single-sample DSP rather
+than a plugin host, amp modeler, or large framework.
+
+Our fork experiment uses that character as a sidecar for Mamut synth work. The
+intended chain is:
+
+```text
+Mamut standalone -> ALSA loopback -> AudioNoise pedal process -> ALSA output
+```
+
+That means AudioNoise stays outside Mamut. Mamut only writes normal ALSA audio;
+AudioNoise captures that stream, runs one pedal-style effect, and plays the
+processed output to another ALSA device. The fork work is focused on practical
+runner code, local loopback documentation, latency/xrun visibility, and small
+effect experiments while preserving the original sample-at-a-time DSP model.
+
+## Original AudioNoise Note
 
 The digital [RP2354 and TAC5112-based guitar
 pedal](https://github.com/torvalds/GuitarPedal) actually does work, even
