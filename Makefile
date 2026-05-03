@@ -62,7 +62,10 @@ gensin.h: gensin
 
 gensin: gensin.c
 
-test: test-sincos test-lfo test-svfdrive
+test: test-fast
+
+test-fast: test-sincos test-svfdrive
+test-exhaustive: test-lfo
 
 tests/lfo: tests/lfo.o
 tests/lfo.o: $(HEADERS)
@@ -79,4 +82,4 @@ tests/svfdrive.o: $(HEADERS)
 test-svfdrive: tests/svfdrive
 	tests/svfdrive
 
-.PHONY: default play $(effects) SeymourDuncan visualize test-lfo test-sincos test-svfdrive
+.PHONY: default play $(effects) SeymourDuncan visualize test test-fast test-exhaustive test-lfo test-sincos test-svfdrive

@@ -1,0 +1,20 @@
+name: Exhaustive LFO
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lfo:
+    name: Exhaustive LFO sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Run exhaustive LFO test
+        run: make test-exhaustive
