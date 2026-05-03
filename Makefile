@@ -98,6 +98,8 @@ SVFDRIVE_REGRESSION_OUTPUT = /tmp/audionoise-svfdrive-regression-output.s32
 test-convert-regression: convert tests/regression/svfdrive_input
 	tests/regression/svfdrive_input > $(SVFDRIVE_REGRESSION_INPUT)
 	./convert svfdrive $(svfdrive_defaults) $(SVFDRIVE_REGRESSION_INPUT) $(SVFDRIVE_REGRESSION_OUTPUT)
-	echo "$(SVFDRIVE_REGRESSION_SHA256)  $(SVFDRIVE_REGRESSION_OUTPUT)" | sha256sum -c -
+	actual=$$(sha256sum $(SVFDRIVE_REGRESSION_OUTPUT) | sed 's/ .*//'); \
+	echo "svfdrive regression sha256=$$actual"; \
+	test "$$actual" = "$(SVFDRIVE_REGRESSION_SHA256)"
 
 .PHONY: default play $(effects) SeymourDuncan visualize test test-fast test-exhaustive test-lfo test-sincos test-svfdrive test-convert-regression
