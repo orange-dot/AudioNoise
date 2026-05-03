@@ -17,6 +17,10 @@ processed output to another ALSA device. The fork work is focused on practical
 runner code, local loopback documentation, latency/xrun visibility, and small
 effect experiments while preserving the original sample-at-a-time DSP model.
 
+The synth side of this experiment lives in
+[orange-dot/mamut-sint-sw](https://github.com/orange-dot/mamut-sint-sw). Mamut
+does not link AudioNoise; it uses AudioNoise as an external ALSA pedal sidecar.
+
 ## Original AudioNoise Note
 
 The digital [RP2354 and TAC5112-based guitar
