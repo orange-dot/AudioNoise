@@ -3,7 +3,14 @@
 // together with basic noise gating
 //
 
-static unsigned int magnitude;
+#include "types.h"
+
+//
+// process_input() carries function-scope static gate state below. Keep one
+// process.h inclusion in each binary's sample-processing TU. The effect
+// registry owns magnitude helpers but must not include this header.
+//
+extern unsigned int magnitude;
 
 #define SAMPLE_TO_FLOAT_MULTIPLIER (1.0 / 0x80000000)
 #define FLOAT_TO_SAMPLE_MULTIPLIER (0x80000000 / 1.0)

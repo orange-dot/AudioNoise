@@ -1,3 +1,7 @@
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "pll.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 static inline void pll_describe(float pot[4])
 {
 	fprintf(stderr, " lpf=%.0f Hz", linear(pot[0], 40.0, 1000.0));

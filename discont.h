@@ -6,6 +6,10 @@
 // Approximate a pitch shifter. Not a great one, I'm
 // afraid.
 //
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "discont.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 struct {
 	struct lfo_state lfo;
 	float step;

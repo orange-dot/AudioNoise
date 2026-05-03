@@ -3,6 +3,10 @@
 // It doesn't actually care about the input, it's useful
 // mainly for testing the LFO
 //
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "fm.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 static struct lfo_state base_lfo, modulator_lfo;
 static float fm_volume, fm_base_freq, fm_freq_range;
 

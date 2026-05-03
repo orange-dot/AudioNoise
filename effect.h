@@ -4,8 +4,12 @@
 // The effects don't have to use these, but they are here to
 // make some basic things very simple to do.
 //
-float sample_array[SAMPLE_ARRAY_SIZE];
-int sample_array_index;
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "effect.h is implementation-private; include effect_registry.h from runners"
+#endif
+
+extern float sample_array[SAMPLE_ARRAY_SIZE];
+extern int sample_array_index;
 
 static float effect_feedback;
 static float effect_delay, target_effect_delay;

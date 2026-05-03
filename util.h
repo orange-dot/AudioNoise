@@ -12,10 +12,7 @@
 // multiplies giving a 64-bit result, so I'm considering doing
 // some fixed-point math, and this preps for it.
 //
-typedef int s32;
-typedef unsigned int u32;
-typedef long long s64;
-typedef unsigned long long u64;
+#include "types.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 

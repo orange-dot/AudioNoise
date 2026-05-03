@@ -18,16 +18,40 @@ jobs:
 
     steps:
       - name: Check out sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Install ALSA headers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
       - name: Build converter
         run: make convert
+
+      - name: Build live ALSA runner
+        run: make live_alsa
 
       - name: Run fast tests
         run: make test-fast
 
       - name: Smoke-test svfdrive converter path
         run: head -c 4096 /dev/zero | ./convert svfdrive 0.45 0.55 0.45 0.25 - /tmp/svfdrive.raw
+
+      - name: Smoke-test live ALSA help
+        run: ./live_alsa --help | grep -E 'svfdrive|--probe|--bypass'
+
+      - name: Reject unknown live ALSA effect
+        run: "! ./live_alsa --effect bogus --input hw:99,99 --output hw:99,99"
+
+      - name: Reject unknown bypass effect before ALSA open
+        run: "! ./live_alsa --bypass --effect bogus --input hw:99,99 --output hw:99,99"
+
+      - name: Reject non-finite live ALSA pot values
+        run: "! ./live_alsa --effect svfdrive --pot0 nan --input hw:99,99 --output hw:99,99"
+
+      - name: Reject non-finite live ALSA wet mix
+        run: "! ./live_alsa --effect svfdrive --wet nan --input hw:99,99 --output hw:99,99"
+
+      - name: Fail cleanly for unavailable probe devices
+        run: "! ./live_alsa --probe --input hw:99,99 --output hw:99,99"
 
   exhaustive-lfo:
     name: Exhaustive LFO sweep
@@ -37,7 +61,7 @@ jobs:
 
     steps:
       - name: Check out sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run exhaustive LFO test
         run: make test-exhaustive

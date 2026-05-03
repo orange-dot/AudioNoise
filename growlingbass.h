@@ -3,6 +3,10 @@
 // tunable odd/even harmonics distorsion
 // Author: Philippe Strauss <catseyechandra@proton.me>
 //
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "growlingbass.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 static struct {
 	float level_sub;
 	float level_odd;

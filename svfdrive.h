@@ -6,6 +6,10 @@
 // clipping before or after a linear filter.
 //
 
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "svfdrive.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 #define SVFDRIVE_PI 3.14159265358979323846f
 
 static struct {

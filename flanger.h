@@ -1,5 +1,9 @@
 // Flanger effect based on the MIT-licensed DaisySP library by Electrosmith
 // which in turn seems to be based on Soundpipe by Paul Batchelor
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "flanger.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 static inline void flanger_describe(float pot[4])
 {
 	fprintf(stderr, " freq=%g Hz", pot[0]*pot[0]*10);

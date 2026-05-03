@@ -1,6 +1,10 @@
 //
 // Minimal echo effect
 //
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "echo.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 static inline void echo_describe(float pot[4])
 {
 	fprintf(stderr, " delay=%g ms", pot[0] * 1000);

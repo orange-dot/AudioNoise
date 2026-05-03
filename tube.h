@@ -35,6 +35,10 @@
 // at least see what it would look like.
 //
 
+#ifndef AUDIONOISE_EFFECT_INTERNAL
+#error "tube.h is implementation-private; include effect_registry.h from runners"
+#endif
+
 static struct {
 	float boost, volume;
 	float lf, hf;
