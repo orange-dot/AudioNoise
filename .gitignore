@@ -5,3 +5,5 @@ convert
 gensin
 gensin.h
 __pycache__/
+live_alsa
+tests/regression/svfdrive_input
